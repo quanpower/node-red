@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 IBM Corp.
+ * Copyright JS Foundation and other contributors, http://js.foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@
  * limitations under the License.
  **/
 
-var RED = require(process.env.NODE_RED_HOME+"/red/red");
-
-function UnknownNode(n) {
-    RED.nodes.createNode(this,n);
+module.exports = function(RED) {
+    "use strict";
+    function UnknownNode(n) {
+        RED.nodes.createNode(this,n);
+    }
+    RED.nodes.registerType("unknown",UnknownNode);
 }
-RED.nodes.registerType("unknown",UnknownNode);

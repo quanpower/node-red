@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 IBM Corp.
+ * Copyright JS Foundation and other contributors, http://js.foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,43 +14,62 @@
  * limitations under the License.
  **/
 
-var RED = require(process.env.NODE_RED_HOME+"/red/red");
-var fs = require("fs");
-var spawn = require('child_process').spawn;
+module.exports = function(RED) {
+    "use strict";
+    var spawn = require('child_process').spawn;
+    var plat = require('os').platform();
 
-function TailNode(n) {
-    RED.nodes.createNode(this,n);
+    if (plat.match(/^win/)) {
+        throw RED._("tail.errors.windowsnotsupport");
+    }
 
-    this.filename = n.filename;
-    this.split = n.split;
-    var node = this;
+    function TailNode(n) {
+        RED.nodes.createNode(this,n);
 
-    var err = "";
-    var tail = spawn("tail", ["-f", this.filename]);
-    tail.stdout.on("data", function (data) {
-        var msg = {topic:node.filename};
-        if (node.split) {
-            var strings = data.toString().split("\n");
-            for (s in strings) {
-                if (strings[s] != "") {
-                    msg.payload = strings[s];
+        this.filename = n.filename;
+        this.filetype = n.filetype || "text";
+        this.split = n.split || false;
+        var node = this;
+
+        var err = "";
+        // TODO: rewrite to use node-tail
+        var tail = spawn("tail", ["-F", "-n", "0", this.filename]);
+        tail.stdout.on("data", function (data) {
+            var msg = { topic:node.filename };
+            if (node.filetype === "text") {
+                if (node.split) {
+                    // TODO: allow customisation of the line break - as we do elsewhere
+                    var strings = data.toString().split("\n");
+                    for (var s in strings) {
+                        //TODO: should we really filter blanks? Is that expected?
+                        if (strings[s] !== "") {
+                            node.send({
+                                topic: node.filename,
+                                payload: strings[s]
+                            });
+                        }
+                    }
+                }
+                else {
+                    msg.payload = data.toString();
                     node.send(msg);
                 }
             }
-        }
-        else {
-            msg.payload = data.toString();
-            node.send(msg);
-        }
-    });
+            else {
+                msg.payload = data;
+                node.send(msg);
+            }
+        });
 
-    tail.stderr.on("data", function(data) {
-        node.warn(data.toString());
-    });
+        tail.stderr.on("data", function(data) {
+            node.error(data.toString());
+        });
 
-    this.on("close", function() {
-        if (tail) tail.kill();
-    });
+        this.on("close", function() {
+            /* istanbul ignore else */
+            if (tail) { tail.kill(); }
+        });
+    }
+
+    RED.nodes.registerType("tail",TailNode);
 }
-
-RED.nodes.registerType("tail",TailNode);

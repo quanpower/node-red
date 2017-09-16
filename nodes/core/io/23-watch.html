@@ -1,5 +1,5 @@
 <!--
-  Copyright 2013 IBM Corp.
+  Copyright JS Foundation and other contributors, http://js.foundation
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,20 +16,34 @@
 
 <script type="text/x-red" data-template-name="watch">
     <div class="form-row node-input-filename">
-         <label for="node-input-files"><i class="icon-file"></i> File(s)</label>
-         <input type="text" id="node-input-files" placeholder="File(s) or Directory">
+         <label for="node-input-files"><i class="fa fa-file"></i> <span data-i18n="watch.label.files"></span></label>
+         <input id="node-input-files" type="text" tabindex="1" data-i18n="[placeholder]watch.placeholder.files">
     </div>
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <label>&nbsp;</label>
+        <input type="checkbox" id="node-input-recursive" style="display:inline-block; width:auto; vertical-align:top;">
+        <label for="node-input-recursive" style="width:70%;"> <span data-i18n="watch.label.recursive"></span></label>
     </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]common.label.name">
+    </div>
+     <div id="node-input-tip" class="form-tips"><span data-i18n="watch.tip"></span></div>
 </script>
 
 <script type="text/x-red" data-help-name="watch">
-	<p>Watches a file or directory for any changes.</p>
-	<p>You can enter a list of comma separated files, or directories if you like. You will need to put " around any that have spaces in.</p>
-	<p>The filename of the file that actually changed is put into <b>msg.payload</b>, while a stringified version of the watched criteria is returned in <b>msg.topic</b>.</p>
-	<p>Of course in Linux, <i>everything</i> could be a file and thus watched...</p>
+    <p>Watches a directory or file for changes.</p>
+    <p>You can enter a list of comma separated directories and/or files. You will
+    need to put quotes "..." around any that have spaces in.</p>
+    <p>On Windows you must use double back-slashes \\ in any directory names.</p>
+    <p>The full filename of the file that actually changed is put into <code>msg.payload</code>,
+    while a stringified version of the watch list is returned in <code>msg.topic</code>.</p>
+    <p><code>msg.file</code> contains just the short filename of the file that changed.
+    <code>msg.type</code> has the type of thing changed, usually <i>file</i> or <i>directory</i>,
+    while <code>msg.size</code> holds the file size in bytes.</p>
+    <p>Of course in Linux, <i>everything</i> is a file and thus can be watched...</p>
+    <p><b>Note: </b>The directory or file must exist in order to be watched. If the file
+    or directory gets deleted it may no longer be monitored even if it gets re-created.</p>
 </script>
 
 <script type="text/javascript">
@@ -37,7 +51,8 @@
         category: 'advanced-input',
         defaults: {
             name: {value:""},
-            files: {value:"",required:true}
+            files: {value:"",required:true},
+            recursive: {value:""}
         },
         color:"BurlyWood",
         inputs:0,

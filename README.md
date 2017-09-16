@@ -1,83 +1,74 @@
 # Node-RED
 
+http://nodered.org
+
+[![Build Status](https://travis-ci.org/node-red/node-red.svg)](https://travis-ci.org/node-red/node-red)
+[![Coverage Status](https://coveralls.io/repos/node-red/node-red/badge.svg?branch=master)](https://coveralls.io/r/node-red/node-red?branch=master)
+
 A visual tool for wiring the Internet of Things.
 
-![Screenshot](http://nodered.org/images/node-red-screenshot.png "Node-RED: A visual tool for wiring the Internet of Things")
+![Node-RED: A visual tool for wiring the Internet of Things](http://nodered.org/images/node-red-screenshot.png)
 
 ## Quick Start
 
-Check out [INSTALL](INSTALL.md) for full instructions on getting started.
+Check out http://nodered.org/docs/getting-started/ for full instructions on getting
+started.
 
-1. download the zip and unzip, or git clone
-2. cd node-red
-3. npm install
-4. node red.js
-5. Open <http://localhost:1880>
+1. `sudo npm install -g node-red`
+2. `node-red`
+3. Open <http://localhost:1880>
 
-## Documentation
+## Getting Help
 
 More documentation can be found [here](http://nodered.org/docs).
 
-For further help, or general discussion, there is also a [mailing list](https://groups.google.com/forum/#!forum/node-red).
+For further help, or general discussion, please use the
+[mailing list](https://groups.google.com/forum/#!forum/node-red).
 
-## Browser Support
+## Developers
 
-The Node-RED editor runs in the browser. We routinely develop and test using
-Chrome and Firefox. We have anecdotal evidence that it works in IE9.
+If you want to run the latest code from git, here's how to get started:
 
-We do not yet support mobile browsers, although that is high on our priority
-list.
+1. Clone the code:
+
+        git clone https://github.com/node-red/node-red.git
+        cd node-red
+
+2. Install the node-red dependencies
+
+        npm install
+
+3. Build the code
+
+        npm run build
+
+4. Run
+
+        npm start
+   or
+
+        node red.js
 
 ## Contributing
 
-### Reporting issues
+Before raising a pull-request, please read our
+[contributing guide](https://github.com/node-red/node-red/blob/master/CONTRIBUTING.md).
 
-Please raise any bug reports on the project's [issue tracker](https://github.com/node-red/node-red/issues?state=open).
-Be sure to search the list to see if your issue has already been raised.
-
-For feature requests, please raise them on the [mailing list](https://groups.google.com/forum/#!forum/node-red)
-first.
-
-### Creating new nodes
-
-The plugin nature of Node-RED means anyone can create a new node to extend
-its capabilities. 
-
-We want to avoid duplication as that can lead to confusion. Many of our existing
-nodes offer a starting point of functionality. If they are missing features,
-we would rather extend them than add separate 'advanced' versions. But the key
-to that approach is getting the UX right to not lose the simplicity.
-
-We are also going to be quite selective over what nodes are included in the main
-repository - enough to be useful, but not so many that new user is overwhelmed.
-
-To contribute a new node, please raise a pull-request against the 
-`node-red-nodes` repository.
-
-Eventually, the nodes will be npm-installable, but we're not there yet. We'll
-also have some sort of registry of nodes to help with discoverability.
-
-### Pull-Requests
-
-In order for us to accept pull-requests, the contributor must first complete
-a Contributor License Agreement (CLA). This clarifies the intellectual 
-property license granted with any contribution. It is for your protection as a 
-Contributor as well as the protection of IBM and its customers; it does not 
-change your rights to use your own Contributions for any other purpose.
-
-Once you have created a pull-request, we'll provide a link to the appropriate
-CLA document.
-
-If you are an IBMer, please contact us directly as the contribution process is
-slightly different.
+This project adheres to the [Contributor Covenant 1.4](http://contributor-covenant.org/version/1/4/).
+ By participating, you are expected to uphold this code. Please report unacceptable
+ behavior to any of the [project's core team](https://github.com/orgs/node-red/teams/core).
 
 ## Authors
 
-Node-RED is a creation of the IBM Emerging Technology Services team.
+Node-RED is a project of the [JS Foundation](http://js.foundation).
+
+It was created by [IBM Emerging Technology](https://www.ibm.com/blogs/emerging-technology/).
 
 * Nick O'Leary [@knolleary](http://twitter.com/knolleary)
 * Dave Conway-Jones [@ceejay](http://twitter.com/ceejay)
 
+
+
 ## Copyright and license
 
-Copyright 2013 IBM Corp. under [the Apache 2.0 license](LICENSE).
+Copyright JS Foundation and other contributors, http://js.foundation under [the Apache 2.0 license](LICENSE).

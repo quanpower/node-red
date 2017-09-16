@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 IBM Corp.
+ * Copyright JS Foundation and other contributors, http://js.foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,60 +14,153 @@
  * limitations under the License.
  **/
 
-var RED = require(process.env.NODE_RED_HOME + "/red/red");
+module.exports = function(RED) {
+    "use strict";
 
-var operators = {
-    'eq': function(a, b) { return a == b; },
-    'neq': function(a, b) { return a != b; },
-    'lt': function(a, b) { return a < b; },
-    'lte': function(a, b) { return a <= b; },
-    'gt': function(a, b) { return a > b; },
-    'gte': function(a, b) { return a >= b; },
-    'btwn': function(a, b, c) { return a >= b && a <= c; },
-    'cont': function(a, b) { return (a + "").indexOf(b) != -1; },
-    'regex': function(a, b) { return (a + "").match(new RegExp(b)); },
-    'true': function(a) { return a === true; },
-    'false': function(a) { return a === false; },
-    'null': function(a) { return typeof a == "undefined"; },
-    'nnull': function(a) { return typeof a != "undefined"; },
-    'else': function(a) { return a === true; }
-};
+    var operators = {
+        'eq': function(a, b) { return a == b; },
+        'neq': function(a, b) { return a != b; },
+        'lt': function(a, b) { return a < b; },
+        'lte': function(a, b) { return a <= b; },
+        'gt': function(a, b) { return a > b; },
+        'gte': function(a, b) { return a >= b; },
+        'btwn': function(a, b, c) { return a >= b && a <= c; },
+        'cont': function(a, b) { return (a + "").indexOf(b) != -1; },
+        'regex': function(a, b, c, d) { return (a + "").match(new RegExp(b,d?'i':'')); },
+        'true': function(a) { return a === true; },
+        'false': function(a) { return a === false; },
+        'null': function(a) { return (typeof a == "undefined" || a === null); },
+        'nnull': function(a) { return (typeof a != "undefined" && a !== null); },
+        'else': function(a) { return a === true; }
+    };
 
-function SwitchNode(n) {
-    RED.nodes.createNode(this, n);
-    this.rules = n.rules;
-    this.property = n.property;
-    this.checkall = n.checkall || "true";
-    var propertyParts = n.property.split("."),
-        node = this;
+    function SwitchNode(n) {
+        RED.nodes.createNode(this, n);
+        this.rules = n.rules || [];
+        this.property = n.property;
+        this.propertyType = n.propertyType || "msg";
 
-    for (var i=0; i<this.rules.length; i+=1) {
-        var rule = this.rules[i];
-        if (!isNaN(Number(rule.v))) {
-            rule.v = Number(rule.v);
-            rule.v2 = Number(rule.v2);
-        }
-    }
-        
-    this.on('input', function (msg) {
-        var onward = [];
-        var prop = propertyParts.reduce(function (obj, i) {
-            return obj[i]
-        }, msg);
-        var elseflag = true;
-        for (var i=0; i<node.rules.length; i+=1) {
-            var rule = node.rules[i];
-            var test = prop;
-            if (rule.t == "else") { test = elseflag; elseflag = true; }
-            if (operators[rule.t](test,rule.v, rule.v2)) {
-                onward.push(msg);
-                elseflag = false;
-                if (node.checkall == "false") { break; }
-            } else {
-                onward.push(null);
+        if (this.propertyType === 'jsonata') {
+            try {
+                this.property = RED.util.prepareJSONataExpression(this.property,this);
+            } catch(err) {
+                this.error(RED._("switch.errors.invalid-expr",{error:err.message}));
+                return;
             }
         }
-        this.send(onward);
-    });
+
+        this.checkall = n.checkall || "true";
+        this.previousValue = null;
+        var node = this;
+        var valid = true;
+        for (var i=0; i<this.rules.length; i+=1) {
+            var rule = this.rules[i];
+            if (!rule.vt) {
+                if (!isNaN(Number(rule.v))) {
+                    rule.vt = 'num';
+                } else {
+                    rule.vt = 'str';
+                }
+            }
+            if (rule.vt === 'num') {
+                if (!isNaN(Number(rule.v))) {
+                    rule.v = Number(rule.v);
+                }
+            } else if (rule.vt === "jsonata") {
+                try {
+                    rule.v = RED.util.prepareJSONataExpression(rule.v,node);
+                } catch(err) {
+                    this.error(RED._("switch.errors.invalid-expr",{error:err.message}));
+                    valid = false;
+                }
+            }
+            if (typeof rule.v2 !== 'undefined') {
+                if (!rule.v2t) {
+                    if (!isNaN(Number(rule.v2))) {
+                        rule.v2t = 'num';
+                    } else {
+                        rule.v2t = 'str';
+                    }
+                }
+                if (rule.v2t === 'num') {
+                    rule.v2 = Number(rule.v2);
+                } else if (rule.v2t === 'jsonata') {
+                    try {
+                        rule.v2 = RED.util.prepareJSONataExpression(rule.v2,node);
+                    } catch(err) {
+                        this.error(RED._("switch.errors.invalid-expr",{error:err.message}));
+                        valid = false;
+                    }
+                }
+            }
+        }
+
+        if (!valid) {
+            return;
+        }
+
+        this.on('input', function (msg) {
+            var onward = [];
+            try {
+                var prop;
+                if (node.propertyType === 'jsonata') {
+                    prop = RED.util.evaluateJSONataExpression(node.property,msg);
+                } else {
+                    prop = RED.util.evaluateNodeProperty(node.property,node.propertyType,node,msg);
+                }
+                var elseflag = true;
+                for (var i=0; i<node.rules.length; i+=1) {
+                    var rule = node.rules[i];
+                    var test = prop;
+                    var v1,v2;
+                    if (rule.vt === 'prev') {
+                        v1 = node.previousValue;
+                    } else if (rule.vt === 'jsonata') {
+                        try {
+                            v1 = RED.util.evaluateJSONataExpression(rule.v,msg);
+                        } catch(err) {
+                            node.error(RED._("switch.errors.invalid-expr",{error:err.message}));
+                            return;
+                        }
+                    } else {
+                        try {
+                            v1 = RED.util.evaluateNodeProperty(rule.v,rule.vt,node,msg);
+                        } catch(err) {
+                            v1 = undefined;
+                        }
+                    }
+                    v2 = rule.v2;
+                    if (rule.v2t === 'prev') {
+                        v2 = node.previousValue;
+                    } else if (rule.v2t === 'jsonata') {
+                        try {
+                            v2 = RED.util.evaluateJSONataExpression(rule.v2,msg);
+                        } catch(err) {
+                            node.error(RED._("switch.errors.invalid-expr",{error:err.message}));
+                            return;
+                        }
+                    } else if (typeof v2 !== 'undefined') {
+                        try {
+                            v2 = RED.util.evaluateNodeProperty(rule.v2,rule.v2t,node,msg);
+                        } catch(err) {
+                            v2 = undefined;
+                        }
+                    }
+                    if (rule.t == "else") { test = elseflag; elseflag = true; }
+                    if (operators[rule.t](test,v1,v2,rule.case)) {
+                        onward.push(msg);
+                        elseflag = false;
+                        if (node.checkall == "false") { break; }
+                    } else {
+                        onward.push(null);
+                    }
+                }
+                node.previousValue = prop;
+                this.send(onward);
+            } catch(err) {
+                node.warn(err);
+            }
+        });
+    }
+    RED.nodes.registerType("switch", SwitchNode);
 }
-RED.nodes.registerType("switch", SwitchNode);

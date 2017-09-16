@@ -1,54 +1,54 @@
-<!--
-  Copyright 2013 IBM Corp.
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
--->
 
 <script type="text/x-red" data-template-name="debug">
     <div class="form-row">
-        <label for="node-input-complete"><i class="icon-list"></i> Output</label>
-        <select type="text" id="node-input-complete" style="display: inline-block; width: auto; vertical-align: top;">
-            <option value=false>Payload only</option>
-            <option value=true>Complete msg object</option>
+        <label for="node-input-typed-complete"><i class="fa fa-list"></i> <span data-i18n="debug.output"></span></label>
+        <input id="node-input-typed-complete" type="text" style="width: 70%">
+        <input id="node-input-complete" type="hidden">
+    </div>
+    <div class="form-row">
+        <label for="node-input-console"><i class="fa fa-random"></i> <span data-i18n="debug.to"></span></label>
+        <select type="text" id="node-input-console" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="false" data-i18n="debug.debtab"></option>
+            <option value="true" data-i18n="debug.tabcon"></option>
         </select>
     </div>
     <div class="form-row">
-        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]common.label.name">
     </div>
 </script>
 
 <script type="text/x-red" data-help-name="debug">
-    <p>The Debug node can be connected to the output of any node. It will display the timestamp, <b>msg.topic</b> and <b>msg.payload</b> fields of any messages it receives in the debug tab of the sidebar.
-    <br/>The sidebar can be accessed under the options drop-down in the top right corner.</p>
-    <p>The button to the right of the node will toggle it's output on and off so you can de-clutter the debug window.</p>
-    <p>If the payload is an object it will be stringified first for display and indicate that by saying "(Object) ".</p>
-    <p>If the payload is a buffer it will be stringified first for display and indicate that by saying "(Buffer) ".</p>
-    <p>Selecting any particular message will highlight (in red) the debug node that reported it. This is useful if you wire up multiple debug nodes.</p>
-    <p>Optionally can show the complete msg object - but the screen can get messy.</p>
-    <p>In addition any calls to node.warn or node.error will appear here.</p>
+    <p>Displays selected message properties in the debug sidebar tab and optionally the runtime log. By default it displays <code>msg.payload</code>.</p>
+    <h3>Details</h3>
+    <p>The debug sidebar provides a structured view of the messages it is sent, making it easier to understand their structure.</p>
+    <p>JavaScript objects and arrays can be collapsed and expanded as required. Buffer objects can be displayed as raw data or as a string if possible.</p>
+    <p>Alongside each message, the debug sidebar includes information about the time the message was received, the node that sent it and the type of the message.
+       Clicking on the source node id will reveal that node within the workspace.</p>
+    <p>The button on the node can be used to enable or disable its output. It is recommended to disable or remove any Debug nodes that are not being used.</p>
+    <p>The node can also be configured to send all messages to the runtime log.</p>
 </script>
+<script src="debug/view/debug-utils.js"></script>
 
 <script type="text/javascript">
+(function() {
+    var subWindow = null;
     RED.nodes.registerType('debug',{
         category: 'output',
         defaults: {
             name: {value:""},
             active: {value:true},
-            complete: {value:false}
+            console: {value:"false"},
+            complete: {value:"false", required:true}
         },
         label: function() {
-            return this.name||"debug";
+            var suffix = "";
+            if (this.console === true || this.console === "true") { suffix = " ⇲"; }
+            if (this.complete === true || this.complete === "true") {
+                return (this.name||"msg") + suffix;
+            } else {
+                return (this.name || "msg." + ((!this.complete || this.complete === "false") ? "payload" : this.complete)) + suffix;
+            }
         },
         labelStyle: function() {
             return this.name?"node_label_italic":"";
@@ -62,189 +62,195 @@
             toggle: "active",
             onclick: function() {
                 var label = this.name||"debug";
-                d3.xhr("debug/"+this.id+"/"+(this.active?"enable":"disable")).post(function(err,resp) {
-                    if (err) {
-                        if (err.status == 404) {
-                            RED.notify("<strong>Error</strong>: debug node not deployed","error");
-                        } else if (err.status == 0) {
-                            RED.notify("<strong>Error</strong>: no response from server","error");
-                        } else {
-                            RED.notify("<strong>Error</strong>: unexpected error: ("+err.status+")"+err.response,"error");
+                var node = this;
+                $.ajax({
+                    url: "debug/"+this.id+"/"+(this.active?"enable":"disable"),
+                    type: "POST",
+                    success: function(resp, textStatus, xhr) {
+                        var historyEvent = {
+                            t:'edit',
+                            node:node,
+                            changes:{
+                                active: !node.active
+                            },
+                            dirty:node.dirty,
+                            changed:node.changed
+                        };
+                        node.changed = true;
+                        node.dirty = true;
+                        RED.nodes.dirty(true);
+                        RED.history.push(historyEvent);
+                        RED.view.redraw();
+                        if (xhr.status == 200) {
+                            RED.notify(node._("debug.notification.activated",{label:label}),"success");
+                        } else if (xhr.status == 201) {
+                            RED.notify(node._("debug.notification.deactivated",{label:label}),"success");
                         }
-                    } else if (resp.status == 200) {
-                        RED.notify("Successfully activated: "+label,"success");
-                    } else if (resp.status == 201) {
-                        RED.notify("Successfully deactivated: "+label,"success");
-                    } else {
-                        RED.notify("<strong>Error</strong>: unexpected response: ("+resp.status+") "+resp.response,"error");
+                    },
+                    error: function(jqXHR,textStatus,errorThrown) {
+                        if (jqXHR.status == 404) {
+                            RED.notify(node._("common.notification.error", {message: node._("common.notification.errors.not-deployed")}),"error");
+                        } else if (jqXHR.status === 0) {
+                            RED.notify(node._("common.notification.error", {message: node._("common.notification.errors.no-response")}),"error");
+                        } else {
+                            RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.unexpected",{status:err.status,message:err.response})}),"error");
+                        }
                     }
                 });
             }
-        }
-    });
+        },
+        onpaletteadd: function() {
 
-    var a = function() {
-        var content = document.createElement("div");
-        content.id = "tab-debug";
-
-        var toolbar = document.createElement("div");
-        toolbar.id = "debug-toolbar";
-        content.appendChild(toolbar);
-
-        toolbar.innerHTML = '<div class="btn-group pull-right"><a id="debug-tab-clear" title="clear log" class="btn btn-mini" href="#"><i class="icon-trash"></i></a></div> ';
-
-        var messages = document.createElement("div");
-        messages.id = "debug-content";
-        content.appendChild(messages);
-
-        RED.sidebar.addTab("debug",content);
-
-        function getTimestamp() {
-            var d = new Date();
-            return d.toUTCString().substring(5,25)+"."+d.getMilliseconds();
-        }
-
-        var sbc = document.getElementById("debug-content");
-
-        var errornotification = null;
-
-        var messageCount = 0;
-
-
-        function debugConnect() {
-            //console.log("debug ws connecting");
-            var path = location.hostname+":"+location.port+document.location.pathname;
-            path = path+(path.slice(-1) == "/"?"":"/")+"debug/ws";
-            path = "ws"+(document.location.protocol=="https:"?"s":"")+"://"+path;
-            var ws = new WebSocket(path);
-            ws.onopen = function() {
-                if (errornotification) {
-                    errornotification.close();
-                    errornotification = null;
-                }
-                //console.log("debug ws connected");
-            }
-            ws.onmessage = function(event) {
-                var o = JSON.parse(event.data);
-                //console.log(msg);
-                var msg = document.createElement("div");
-                msg.onmouseover = function() {
-                    msg.style.borderRightColor = "#999";
-                    RED.nodes.eachNode(function(node) {
-                        if( node.id == o.id) {
-                            node.highlighted = true;
-                            node.dirty = true;
+            var options = {
+                messageMouseEnter: function(sourceId) {
+                    if (sourceId) {
+                        var n = RED.nodes.node(sourceId);
+                        if (n) {
+                            n.highlighted = true;
+                            n.dirty = true;
                         }
+                        RED.view.redraw();
+                    }
+                },
+                messageMouseLeave: function(sourceId) {
+                    if (sourceId) {
+                        var n = RED.nodes.node(sourceId);
+                        if (n) {
+                            n.highlighted = false;
+                            n.dirty = true;
+                        }
+                        RED.view.redraw();
+                    }
+                },
+                messageSourceClick: function(sourceId) {
+                    RED.view.reveal(sourceId);
+                },
+                clear: function() {
+                    RED.nodes.eachNode(function(node) {
+                        node.highlighted = false;
+                        node.dirty = true;
                     });
                     RED.view.redraw();
-                };
-                msg.onmouseout = function() {
-                    msg.style.borderRightColor = "";
-                    RED.nodes.eachNode(function(node) {
-                        if( node.id == o.id) {
-                            node.highlighted = false;
-                            node.dirty = true;
-                        }
-                    });
-                    RED.view.redraw();
-                };
-                var name = (o.name?o.name:o.id).toString().replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                var topic = (o.topic||"").toString().replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                var payload = (o.msg||"").toString().replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                msg.className = 'debug-message'+(o.level?(' debug-message-level-'+o.level):'')
-                msg.innerHTML = '<span class="debug-message-date">'+getTimestamp()+'</span>'+
-                                '<span class="debug-message-name">['+name+']</span>'+
-                                (o.topic?'<span class="debug-message-topic">'+topic+'</span>':'')+
-                                '<span class="debug-message-payload">'+payload+'</span>';
-                var atBottom = (sbc.scrollHeight-messages.offsetHeight-sbc.scrollTop) < 5;
-                messageCount++;
-                $(messages).append(msg);
-
-                if (messageCount > 200) {
-                    $("#debug-content .debug-message:first").remove();
-                    messageCount--;
-                }
-                if (atBottom) {
-                    $(sbc).scrollTop(sbc.scrollHeight);
                 }
             };
-            ws.onclose = function() {
-                if (errornotification == null) {
-                    errornotification = RED.notify("<b>Error</b>: Lost connection to server","error",true);
+
+            var uiComponents = RED.debug.init(options);
+
+            RED.sidebar.addTab({
+                id: "debug",
+                label: this._("debug.sidebar.label"),
+                name: this._("debug.sidebar.name"),
+                content: uiComponents.content,
+                toolbar: uiComponents.footer,
+                enableOnEdit: true
+            });
+            RED.actions.add("core:show-debug-tab",function() { RED.sidebar.show('debug'); });
+
+            var that = this;
+            RED._debug = function(msg) {
+                that.handleDebugMessage("",{
+                    name:"debug",
+                    msg:msg
+                });
+            };
+
+            this.refreshMessageList = function() {
+                RED.debug.refreshMessageList(RED.workspaces.active());
+                if (subWindow) {
+                    try {
+                        subWindow.postMessage({event:"workspaceChange",activeWorkspace:RED.workspaces.active()},"*");
+                    } catch(err) {
+                        console.log(err);
+                    }
                 }
-                setTimeout(debugConnect,1000);
+            };
+            RED.events.on("workspace:change", this.refreshMessageList);
+
+            this.handleDebugMessage = function(t,o) {
+                var sourceNode = RED.nodes.node(o.id) || RED.nodes.node(o.z);
+                if (sourceNode) {
+                    o._source = {id:sourceNode.id,z:sourceNode.z,name:sourceNode.name};
+
+                }
+                RED.debug.handleDebugMessage(o);
+                if (subWindow) {
+                    try {
+                        subWindow.postMessage({event:"message",msg:o},"*");
+                    } catch(err) {
+                        console.log(err);
+                    }
+                }
+            };
+            RED.comms.subscribe("debug",this.handleDebugMessage);
+
+            $("#debug-tab-open").click(function(e) {
+                e.preventDefault();
+                subWindow = window.open(document.location.toString().replace(/[?#].*$/,"")+"debug/view/view.html"+document.location.search,"nodeREDDebugView","menubar=no,location=no,toolbar=no,chrome,height=500,width=600");
+                subWindow.onload = function() {
+                    subWindow.postMessage({event:"workspaceChange",activeWorkspace:RED.workspaces.active()},"*");
+                };
+            });
+
+            $(window).unload(function() {
+                if (subWindow) {
+                    try {
+                        subWindow.close();
+                    } catch(err) {
+                        console.log(err);
+                    }
+                }
+            });
+
+            this.handleWindowMessage = function(evt) {
+                var msg = evt.data;
+                if (msg.event === "mouseEnter") {
+                    options.messageMouseEnter(msg.id);
+                } else if (msg.event === "mouseLeave") {
+                    options.messageMouseLeave(msg.id);
+                } else if (msg.event === "mouseClick") {
+                    options.messageSourceClick(msg.id);
+                } else if (msg.event === "clear") {
+                    options.clear();
+                }
+            };
+            window.addEventListener('message',this.handleWindowMessage);
+        },
+        onpaletteremove: function() {
+            RED.comms.unsubscribe("debug",this.handleDebugMessage);
+            RED.sidebar.removeTab("debug");
+            RED.events.off("workspace:change", this.refreshMessageList);
+            window.removeEventListener("message",this.handleWindowMessage);
+            RED.actions.remove("core:show-debug");
+
+            delete RED._debug;
+        },
+        oneditprepare: function() {
+            $("#node-input-typed-complete").typedInput({types:['msg', {value:"full",label:RED._("node-red:debug.msgobj"),hasValue:false}]});
+            if (this.complete === "true" || this.complete === true) {
+                // show complete message object
+                $("#node-input-typed-complete").typedInput('type','full');
+            } else {
+                var property = (!this.complete||(this.complete === "false")) ? "payload" : this.complete+"";
+                $("#node-input-typed-complete").typedInput('type','msg');
+                $("#node-input-typed-complete").typedInput('value',property);
+            }
+            $("#node-input-typed-complete").on('change',function() {
+                if ($("#node-input-typed-complete").typedInput('type') === 'msg' &&
+                    $("#node-input-typed-complete").typedInput('value') === ''
+                ) {
+                    $("#node-input-typed-complete").typedInput('value','payload');
+                }
+            });
+        },
+        oneditsave: function() {
+            var type = $("#node-input-typed-complete").typedInput('type');
+            if (type === 'full') {
+                $("#node-input-complete").val("true");
+            } else {
+                $("#node-input-complete").val($("#node-input-typed-complete").typedInput('value'));
             }
         }
-        debugConnect();
 
-        $("#debug-tab-clear").click(function() {
-            $(".debug-message").remove();
-            messageCount = 0;
-            RED.nodes.eachNode(function(node) {
-                node.highlighted = false;
-                node.dirty = true;
-            });
-            RED.view.redraw();
-        });
-
-    }();
+    });
+})();
 </script>
-
-<style>
-    #debug-content {
-        position: absolute;
-        top: 30px;
-        bottom: 0px;
-        left:0px;
-        right: 0px;
-        overflow-y: scroll;
-    }
-    #debug-toolbar {
-        padding: 3px 10px;
-        height: 24px;
-        background: #f3f3f3;
-    }
-    .debug-message {
-        cursor: pointer;
-        border-bottom: 1px solid #eee;
-        border-left: 8px solid #eee;
-        border-right: 8px solid #eee;
-        padding: 2px;
-    }
-    .debug-message-date {
-        background: #fff;
-        font-size: 9px;
-        color: #aaa;
-        padding: 1px 5px 1px 1px;
-    }
-    .debug-message-topic {
-        display: block;
-        background: #fff;
-        padding: 1px 5px;
-        font-size: 9px;
-        color: #a66;
-    }
-    .debug-message-name {
-        background: #fff;
-        padding: 1px 5px;
-        font-size: 9px;
-        color: #aac;
-    }
-    .debug-message-payload {
-        display: block;
-        padding: 2px;
-        background: #fff;
-    }
-    .debug-message-level-log {
-        border-left-color: #eee;
-        border-right-color: #eee;
-    }
-    .debug-message-level-warn {
-        border-left-color: #ffdf9d;
-        border-right-color: #ffdf9d;
-    }
-    .debug-message-level-error {
-        border-left-color: #f99;
-        border-right-color: #f99;
-    }
-</style>

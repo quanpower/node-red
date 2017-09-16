@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 IBM Corp.
+ * Copyright JS Foundation and other contributors, http://js.foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,39 +14,55 @@
  * limitations under the License.
  **/
 
-// If you use this as a template, replace IBM Corp. with your own name.
+// If you use this as a template, update the copyright with your own name.
 
 // Sample Node-RED node file
 
-// Require main module
-var RED = require(process.env.NODE_RED_HOME+"/red/red");
 
-// The main node definition - most things happen in here
-function SampleNode(n) {
-    // Create a RED node
-    RED.nodes.createNode(this,n);
+module.exports = function(RED) {
+    "use strict";
+    // require any external libraries we may need....
+    //var foo = require("foo-library");
 
-    // Store local copies of the node configuration (as defined in the .html)
-    this.topic = n.topic;
+    // The main node definition - most things happen in here
+    function SampleNode(n) {
+        // Create a RED node
+        RED.nodes.createNode(this,n);
 
-    // Do whatever you need to do in here - declare callbacks etc
-    // Note: this sample doesn't do anything much - it will only send
-    // this message once at startup...
-    // Look at other real nodes for some better ideas of what to do....
-    var msg = {};
-    msg.topic = this.topic;
-    msg.payload = "Hello world !"
+        // Store local copies of the node configuration (as defined in the .html)
+        this.topic = n.topic;
 
-    // send out the message to the rest of the workspace.
-    this.send(msg);
+        // copy "this" object in case we need it in context of callbacks of other functions.
+        var node = this;
 
-    this.on("close", function() {
-        // Called when the node is shutdown - eg on redeploy.
-        // Allows ports to be closed, connections dropped etc.
-        // eg: this.client.disconnect();
-    });
+        // Do whatever you need to do in here - declare callbacks etc
+        // Note: this sample doesn't do anything much - it will only send
+        // this message once at startup...
+        // Look at other real nodes for some better ideas of what to do....
+        var msg = {};
+        msg.topic = this.topic;
+        msg.payload = "Hello world !"
+
+        // send out the message to the rest of the workspace.
+        // ... this message will get sent at startup so you may not see it in a debug node.
+        this.send(msg);
+
+        // respond to inputs....
+        this.on('input', function (msg) {
+            node.warn("I saw a payload: "+msg.payload);
+            // in this example just send it straight on... should process it here really
+            node.send(msg);
+        });
+
+        this.on("close", function() {
+            // Called when the node is shutdown - eg on redeploy.
+            // Allows ports to be closed, connections dropped etc.
+            // eg: node.client.disconnect();
+        });
+    }
+
+    // Register the node by name. This must be called before overriding any of the
+    // Node functions.
+    RED.nodes.registerType("sample",SampleNode);
+
 }
-
-// Register the node by name. This must be called before overriding any of the
-// Node functions.
-RED.nodes.registerType("sample",SampleNode);

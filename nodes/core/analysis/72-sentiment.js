@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 IBM Corp.
+ * Copyright JS Foundation and other contributors, http://js.foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,23 @@
  * limitations under the License.
  **/
 
-var RED = require(process.env.NODE_RED_HOME+"/red/red");
-var sentiment = require('sentiment');
+module.exports = function(RED) {
+    "use strict";
+    var sentiment = require('sentiment');
 
-function SentimentNode(n) {
-    RED.nodes.createNode(this,n);
-    var node = this;
+    function SentimentNode(n) {
+        RED.nodes.createNode(this,n);
+        var node = this;
 
-    this.on("input", function(msg) {
-        sentiment(msg.payload, function (err, result) {
-            msg.sentiment = result;
-            node.send(msg);
+        this.on("input", function(msg) {
+            if (msg.hasOwnProperty("payload")) {
+                sentiment(msg.payload, msg.overrides || null, function (err, result) {
+                    msg.sentiment = result;
+                    node.send(msg);
+                });
+            }
+            else { node.send(msg); } // If no payload - just pass it on.
         });
-    });
+    }
+    RED.nodes.registerType("sentiment",SentimentNode);
 }
-RED.nodes.registerType("sentiment",SentimentNode);
